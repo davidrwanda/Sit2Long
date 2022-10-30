@@ -15,8 +15,7 @@
   ~ limitations under the License.
   -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
-    package="com.google.example.android.basicactivityrecognitiontransitionsample">
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Required to access activity recognition. -->
     <!-- TODO: Add both activity recognition permissions to the manifest. -->
