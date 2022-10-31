@@ -112,14 +112,34 @@ public class MainActivity extends AppCompatActivity {
         activityTransitionList = new ArrayList<>();
 
         // TODO: Add activity transitions to track.
-
+        // TODO: Add activity transitions to track.
+        activityTransitionList.add(new ActivityTransition.Builder()
+                .setActivityType(DetectedActivity.WALKING)
+                .setActivityTransition(ActivityTransition.ACTIVITY_TRANSITION_ENTER)
+                .build());
+        activityTransitionList.add(new ActivityTransition.Builder()
+                .setActivityType(DetectedActivity.WALKING)
+                .setActivityTransition(ActivityTransition.ACTIVITY_TRANSITION_EXIT)
+                .build());
+        activityTransitionList.add(new ActivityTransition.Builder()
+                .setActivityType(DetectedActivity.STILL)
+                .setActivityTransition(ActivityTransition.ACTIVITY_TRANSITION_ENTER)
+                .build());
+        activityTransitionList.add(new ActivityTransition.Builder()
+                .setActivityType(DetectedActivity.STILL)
+                .setActivityTransition(ActivityTransition.ACTIVITY_TRANSITION_EXIT)
+                .build());
 
         // TODO: Initialize PendingIntent that will be triggered when a activity transition occurs.
-
+        Intent intent = new Intent(TRANSITIONS_RECEIVER_ACTION);
+        mActivityTransitionsPendingIntent =
+                PendingIntent.getBroadcast(MainActivity.this, 0, intent, 0);
 
         // TODO: Create a BroadcastReceiver to listen for activity transitions.
 
-
+        // The receiver listens for the PendingIntent above that is triggered by the system when an
+        // activity transition occurs.
+        mTransitionsReceiver = new TransitionsReceiver();
         printToScreen("App initialized.");
     }
 
@@ -128,6 +148,7 @@ public class MainActivity extends AppCompatActivity {
         super.onStart();
 
         // TODO: Register the BroadcastReceiver to listen for activity transitions.
+        registerReceiver(mTransitionsReceiver, new IntentFilter(TRANSITIONS_RECEIVER_ACTION));
 
     }
 
@@ -136,7 +157,9 @@ public class MainActivity extends AppCompatActivity {
 
         // TODO: Disable activity transitions when user leaves the app.
 
-
+        if (activityTrackingEnabled) {
+            disableActivityTransitions();
+        }
         super.onPause();
     }
 
@@ -145,7 +168,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onStop() {
 
         // TODO: Unregister activity transition receiver when user leaves the app.
-
+        unregisterReceiver(mTransitionsReceiver);
         super.onStop();
     }
 
@@ -169,7 +192,32 @@ public class MainActivity extends AppCompatActivity {
 
 
         // TODO: Create request and listen for activity changes.
+        ActivityTransitionRequest request = new ActivityTransitionRequest(activityTransitionList);
 
+// Register for Transitions Updates.
+        Task<Void> task =
+                ActivityRecognition.getClient(this)
+                        .requestActivityTransitionUpdates(request, mActivityTransitionsPendingIntent);
+
+
+        task.addOnSuccessListener(
+                new OnSuccessListener<Void>() {
+                    @Override
+                    public void onSuccess(Void result) {
+                        activityTrackingEnabled = true;
+                        printToScreen("Transitions Api was successfully registered.");
+
+                    }
+                });
+        task.addOnFailureListener(
+                new OnFailureListener() {
+                    @Override
+                    public void onFailure(@NonNull Exception e) {
+                        printToScreen("Transitions Api could NOT be registered: " + e);
+                        Log.e(TAG, "Transitions Api could NOT be registered: " + e);
+
+                    }
+                });
 
     }
 
@@ -184,6 +232,21 @@ public class MainActivity extends AppCompatActivity {
 
 
         // TODO: Stop listening for activity changes.
+        ActivityRecognition.getClient(this).removeActivityTransitionUpdates(mActivityTransitionsPendingIntent)
+                .addOnSuccessListener(new OnSuccessListener<Void>() {
+                    @Override
+                    public void onSuccess(Void aVoid) {
+                        activityTrackingEnabled = false;
+                        printToScreen("Transitions successfully unregistered.");
+                    }
+                })
+                .addOnFailureListener(new OnFailureListener() {
+                    @Override
+                    public void onFailure(@NonNull Exception e) {
+                        printToScreen("Transitions could not be unregistered: " + e);
+                        Log.e(TAG,"Transitions could not be unregistered: " + e);
+                    }
+                });
 
     }
 
@@ -208,6 +271,22 @@ public class MainActivity extends AppCompatActivity {
     public void onClickEnableOrDisableActivityRecognition(View view) {
 
         // TODO: Enable/Disable activity tracking and ask for permissions if needed.
+        if (activityRecognitionPermissionApproved()) {
+
+            if (activityTrackingEnabled) {
+                disableActivityTransitions();
+
+            } else {
+                enableActivityTransitions();
+            }
+
+        } else {
+            // Request permission and start activity for result. If the permission is approved, we
+            // want to make sure we start activity recognition tracking.
+            Intent startIntent = new Intent(this, PermissionRationalActivity.class);
+            startActivityForResult(startIntent, 0);
+
+        }
 
     }
 
@@ -234,7 +313,19 @@ public class MainActivity extends AppCompatActivity {
             }
 
             // TODO: Extract activity transition information from listener.
+            if (ActivityTransitionResult.hasResult(intent)) {
 
+                ActivityTransitionResult result = ActivityTransitionResult.extractResult(intent);
+
+                for (ActivityTransitionEvent event : result.getTransitionEvents()) {
+
+                    String info = "Transition: " + toActivityString(event.getActivityType()) +
+                            " (" + toTransitionType(event.getTransitionType()) + ")" + "   " +
+                            new SimpleDateFormat("HH:mm:ss", Locale.US).format(new Date());
+
+                    printToScreen(info);
+                }
+            }
         }
     }
 }
